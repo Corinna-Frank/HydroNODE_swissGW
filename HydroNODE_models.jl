@@ -198,3 +198,70 @@ elseif chosen_model_id == "M100"
 else
     println.("chosen_model_id not available!")
 end
+
+
+# Swiss Groundwater ==================================================================
+
+# SNOW bucket
+
+# parameters
+k   = 10.0  # melting coeff
+T_t = 0.0   # threshold melting temperature
+# snow precipitation
+Ps(P, T; T_t = 0.0) = step_fct(T_t-T)*P
+
+# rain precipitation
+Pr(P, T; T_t = 0.0) = step_fct(T-T_t)*P
+
+melt(S0, T; k=10.0, T_t=0.0) = step_fct(T-T_t)*step_fct(S0)*(k*(T-T_t))
+
+# INTERCEPT bucket
+
+S1max = 2     # maximum storage capacity of the interception reservoir
+k_v = 1.0      # vegetation coeff
+Emax(PET; k_v = 1.0) = k_v*PET
+Ei(S1,PET; k_v = 1.0) = step_fct(S1)*minimum([S1, Emax(PET; k_v = k_v)])
+
+Pe(S1; S1max = 2) = step_fct(S1-S1max)*(S1-S1max)
+
+
+# ROOT bucket
+
+l_p   = 0.25  # root coeff
+log_S2max = 0.0   # maximum storage capacity of the root zone reservoir
+Et(S2, Emax, Ei; l_p = 0.25, log_S2max = 0.0) = step_fct(S2)*(Emax(PET; k_v = k_v)-Ei(S1,PET; k_v = k_v))*minimum([1.0, S2/(l_p*exp(log_S2max))])
+
+gamma   = 2.0 # non-linearity
+log_k_s = -6  # hydraulic conductivity
+R(S; log_S2max=0.0, log_k_s = -6, gamma = 2.0) = step_fct(S)*exp(log_k_s)*(S/exp(log_S2max))^gamma
+
+# Response Function
+
+function swissGW_buckets(p_, t_out)
+
+
+    function swissGW_buckets_core!(dS,S,ps,t)
+        k, T_t, k_v, S1max, l_p, log_S2max, log_k_s, gamma = ps
+
+        P    = itp_P(t)
+        T    = itp_T(t)
+        PET  = itp_PET(t)
+
+        dS[1] = Ps(P,T;T_t = T_t) - melt(S[1], T; k = k, T_t = T_t)
+        dS[2] = Pr(P,T;T_t = T_t) + melt(S[1], T; k = k, T_t = T_t) - Ei(S[2],PET; k_v = k_v) - Pe(S[2]; S1max = S1max)
+        dS[3] = Pe(S[2]; S1max = S1max) - Et(S[3], Emax, Ei; l_p = l_p, log_S2max = log_S2max) - R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, gamma = gamma)
+
+    end
+
+    prob = ODEProblem(swissGW_buckets_core!, p_[1:2], Float64.((t_out[1], maximum(t_out))))
+
+    sol = solve(prob, BS3(), u0 = p_[1:2], p=p_[3:end], saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= ForwardDiffSensitivity())
+
+    Qb_ = Qb.(sol[2,:], p_[3], p_[4], p_[5])
+    Qs_ = Qs.(sol[2,:], p_[4])
+
+    Qout_ = Qb_.+Qs_
+
+    return Qout_, sol
+
+end
