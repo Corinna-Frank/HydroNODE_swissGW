@@ -24,6 +24,9 @@ using ForwardDiff, Zygote
 using Interpolations
 using Interpolations: interpolate
 
+using SpecialFunctions # for gamma_inc
+using DSP # for conv
+
 using Random
 Random.seed!(123)
 

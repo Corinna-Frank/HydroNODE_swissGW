@@ -257,11 +257,25 @@ function swissGW_buckets(p_, t_out)
 
     sol = solve(prob, BS3(), u0 = p_[1:2], p=p_[3:end], saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= ForwardDiffSensitivity())
 
-    Qb_ = Qb.(sol[2,:], p_[3], p_[4], p_[5])
-    Qs_ = Qs.(sol[2,:], p_[4])
+    # Marvin's version:
+    # Qb_ = Qb.(sol[2,:], p_[3], p_[4], p_[5])
+    # Qs_ = Qs.(sol[2,:], p_[4])
+    # Qout_ = Qb_.+Qs_
 
-    Qout_ = Qb_.+Qs_
+    # Pastas in python:
+    # t = np.arange(0,1e4)
+    # step = p0 * scipy.special.gammainc(p1, t/p2)
+    # block = step[1:] - step[:-1]
+    # contrib = np.convolve(recharge, block)
 
-    return Qout_, sol
+    t = collect(1:1e4)
+    step = p0 * gamma_inc(p1, t/p2, IND=0) # IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
+    block = step[2:end] - step[1:end-1]
+    contrib = conv(R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, gamma = gamma), block)
+
+    GW_head = GW_avg + contrib # GW_avg is a specific number
+
+    # return Qout_, sol
+    return GW_head, sol
 
 end
