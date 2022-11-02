@@ -13,7 +13,7 @@ using Pkg; Pkg.activate("."); Pkg.instantiate()
 using Revise
 
 using DataFrames, Dates, Statistics
-using DelimitedFiles, CSV, JLD
+using DelimitedFiles, CSV #, JLD
 
 using OrdinaryDiffEq, DiffEqFlux, Flux
 using DiffEqSensitivity
@@ -35,7 +35,8 @@ Random.seed!(123)
 # USER INPUT:
 
 # set data directory
-data_path = joinpath(pwd(),"basin_dataset_public_v1p2")
+data_path = joinpath(pwd(),"data")
+data_filename = "Crêtelongue.csv"
 
 # choose model M50 or M100
 chosen_model_id = "M50"
@@ -44,14 +45,14 @@ chosen_model_id = "M50"
 basin_id = "01013500"
 
 # define training and testing period
-train_start_date = Date(1980,10,01)
-train_stop_date = Date(1981,09,30)
-test_start_date = Date(1981,10,01)
-test_stop_date = Date(2010,09,30)
+train_start_date = Date(2000,01,01)
+train_stop_date = Date(2015,12,31)
+test_start_date = Date(2016,01,01)
+test_stop_date = Date(2020,12,31)
 
 
 # if `false`, read the bucket model (M0) parameters from "bucket_opt_init.csv"
-train_bucket_model = false
+train_bucket_model = true
 
 # ===========================================================
 
@@ -76,15 +77,17 @@ end
 # -------------------------------------------------------
 # Load and preprocess data
 
-input_var_names = ["Daylight(h)", "Prec(mm/day)", "Tmean(C)"]
-output_var_name = "Flow(mm/s)"
+#Date,heads,precipitation,temperature,evaporation,rivers
+input_var_names = ["precipitation","temperature","evaporation"]#["Daylight(h)", "Prec(mm/day)", "Tmean(C)"]
+output_var_name = "heads"#"Flow(mm/s)"
 
-df = load_data(lpad(string(basin_id), 8, "0"), data_path)
+df = load_data(data_path, data_filename)
 
 # drop unused cols
-select!(df, Not(Symbol("SWE(mm)")));
-select!(df, Not(Symbol("Tmax(C)")));
-select!(df, Not(Symbol("Tmin(C)")));
+select!(df, Not(Symbol("rivers")));
+# select!(df, Not(Symbol("SWE(mm)")));
+# select!(df, Not(Symbol("Tmax(C)")));
+# select!(df, Not(Symbol("Tmin(C)")));
 
 # adjust start and stop date if necessary
 if df[1, "Date"] != train_start_date
