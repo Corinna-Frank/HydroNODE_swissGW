@@ -237,7 +237,11 @@ R(S; log_S2max=0.0, log_k_s = -6, gamma = 2.0) = step_fct(S)*exp(log_k_s)*(S/exp
 
 # Response Function
 
+p_all = S0_init, S1_init, S2_init, p0, p1, p2, k, T_t , k_v, S1max, l_p, log_S2max, log_k_s, gamma
+
 function swissGW_buckets(p_, t_out)
+
+    p0, p1, p2 = p_[4:6]
 
 
     function swissGW_buckets_core!(dS,S,ps,t)
@@ -253,9 +257,9 @@ function swissGW_buckets(p_, t_out)
 
     end
 
-    prob = ODEProblem(swissGW_buckets_core!, p_[1:2], Float64.((t_out[1], maximum(t_out))))
+    prob = ODEProblem(swissGW_buckets_core!, p_[1:3], Float64.((t_out[1], maximum(t_out))))
 
-    sol = solve(prob, BS3(), u0 = p_[1:2], p=p_[3:end], saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= ForwardDiffSensitivity())
+    sol = solve(prob, BS3(), u0 = p_[1:3], p=p_[7:end], dt = 1.0, saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= ForwardDiffSensitivity())
 
     # Marvin's version:
     # Qb_ = Qb.(sol[2,:], p_[3], p_[4], p_[5])
@@ -268,7 +272,7 @@ function swissGW_buckets(p_, t_out)
     # block = step[1:] - step[:-1]
     # contrib = np.convolve(recharge, block)
 
-    t = collect(1:1e4)
+    t = collect(1:5000)
     step = p0 * gamma_inc(p1, t/p2, IND=0) # IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
     block = step[2:end] - step[1:end-1]
     contrib = conv(R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, gamma = gamma), block)
@@ -279,3 +283,7 @@ function swissGW_buckets(p_, t_out)
     return GW_head, sol
 
 end
+
+
+
+swissGW_buckets_Sfix(States_init) = swissGW_buckets([States_init, p_rest], t_out)
