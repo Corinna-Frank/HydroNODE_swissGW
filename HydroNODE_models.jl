@@ -229,15 +229,23 @@ Pe(S1; S1max = 2) = step_fct(S1-S1max)*(S1-S1max)
 
 l_p   = 0.25  # root coeff
 log_S2max = 0.0   # maximum storage capacity of the root zone reservoir
-Et(S2, Emax, Ei; l_p = 0.25, log_S2max = 0.0) = step_fct(S2)*(Emax(PET; k_v = k_v)-Ei(S1,PET; k_v = k_v))*minimum([1.0, S2/(l_p*exp(log_S2max))])
+Et(S2, Emax, Ei; l_p = 0.25, log_S2max = 0.0) = step_fct(S2)*(Emax(PET; k_v = k_v)-Ei(S1,PET; k_v = k_v))*minimum([1.0, S2/(l_p*10^(log_S2max))])
 
-gamma   = 2.0 # non-linearity
+log_gamma   = 1.0 # non-linearity
 log_k_s = -6  # hydraulic conductivity
-R(S; log_S2max=0.0, log_k_s = -6, gamma = 2.0) = step_fct(S)*exp(log_k_s)*(S/exp(log_S2max))^gamma
+R(S; log_S2max=0.0, log_k_s = -6, log_gamma = 1.0) = step_fct(S)*10^(log_k_s)*(S/10^(log_S2max))^10^(log_gamma)
 
-# Response Function
+# Response Function parameters
+p0 = 10 # A
+p1 = 1 # n
+p2 = 100 # a [days]
 
-p_all = S0_init, S1_init, S2_init, p0, p1, p2, k, T_t , k_v, S1max, l_p, log_S2max, log_k_s, gamma
+# initial states 
+S0_init = 0
+S1_init = 0
+S2_init = 0
+
+p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2, k, T_t , k_v, S1max, l_p, log_S2max, log_k_s, log_gamma]
 
 function swissGW_buckets(p_, t_out)
 
@@ -245,7 +253,7 @@ function swissGW_buckets(p_, t_out)
 
 
     function swissGW_buckets_core!(dS,S,ps,t)
-        k, T_t, k_v, S1max, l_p, log_S2max, log_k_s, gamma = ps
+        k, T_t, k_v, S1max, l_p, log_S2max, log_k_s, log_gamma = ps
 
         P    = itp_P(t)
         T    = itp_T(t)
@@ -253,7 +261,7 @@ function swissGW_buckets(p_, t_out)
 
         dS[1] = Ps(P,T;T_t = T_t) - melt(S[1], T; k = k, T_t = T_t)
         dS[2] = Pr(P,T;T_t = T_t) + melt(S[1], T; k = k, T_t = T_t) - Ei(S[2],PET; k_v = k_v) - Pe(S[2]; S1max = S1max)
-        dS[3] = Pe(S[2]; S1max = S1max) - Et(S[3], Emax, Ei; l_p = l_p, log_S2max = log_S2max) - R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, gamma = gamma)
+        dS[3] = Pe(S[2]; S1max = S1max) - Et(S[3], Emax, Ei; l_p = l_p, log_S2max = log_S2max) - R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, log_gamma = log_gamma)
 
     end
 
@@ -275,7 +283,7 @@ function swissGW_buckets(p_, t_out)
     t = collect(1:5000)
     step = p0 * gamma_inc(p1, t/p2, IND=0) # IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
     block = step[2:end] - step[1:end-1]
-    contrib = conv(R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, gamma = gamma), block)
+    contrib = conv(R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, log_gamma = log_gamma), block)
 
     GW_head = GW_avg + contrib # GW_avg is a specific number
 
@@ -285,5 +293,5 @@ function swissGW_buckets(p_, t_out)
 end
 
 
-
-swissGW_buckets_Sfix(States_init) = swissGW_buckets([States_init, p_rest], t_out)
+# closure function (fixes certain parameters to specific value)
+# swissGW_buckets_Sfix(States_init) = swissGW_buckets([States_init, p_rest], t_out)

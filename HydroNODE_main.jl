@@ -121,7 +121,8 @@ itp_T = interpolate(data_timepoints, data_x[:,3], itp_method)
 # ===============================================================
 # Bucket model training and full model preparation
 
-NSE_loss_bucket_w_states(p) =  NSE_loss(basic_bucket_incl_states, p, train_y, train_timepoints)[1]
+NSE_loss_bucket_w_states(p) =  NSE_loss(swissGW_buckets, p, train_y, train_timepoints)[1]
+# NSE_loss_bucket_w_states(p) =  NSE_loss(basic_bucket_incl_states, p, train_y, train_timepoints)[1]
 
 @info "Bucket model training..."
 
@@ -135,8 +136,9 @@ NSE_loss_bucket_w_states(p) =  NSE_loss(basic_bucket_incl_states, p, train_y, tr
 
 
 if train_bucket_model
-    lower_bounds = [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
-    upper_bounds = [1500.0, 1500.0, 0.1, 1500.0, 50.0, 5.0, 3.0, 0.0]
+    # p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2, k, T_t , k_v, S1max, l_p, log_S2max, log_k_s, log_gamma]
+    lower_bounds = [0,0,0, 1e-9,1e-2,1e-2, 1,  0, 0.5, 2, 0.25, -5, -9, -5 ] # [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
+    upper_bounds = [0,0,0, 1e4, 1e2, 2e3,  20, 0, 1.5, 2, 0.25,  3,  4, 1.3] # [1500.0, 1500.0, 0.1, 1500.0, 50.0, 5.0, 3.0, 0.0]
 
     SearchRange = [(lower_bounds[i], upper_bounds[i]) for i in 1:length(lower_bounds)]
 
