@@ -213,39 +213,39 @@ Ps(P, T; T_t = 0.0) = step_fct(T_t-T)*P
 # rain precipitation
 Pr(P, T; T_t = 0.0) = step_fct(T-T_t)*P
 
-melt(S0, T; k=10.0, T_t=0.0) = step_fct(T-T_t)*step_fct(S0)*(k*(T-T_t))
+melt(S1, T; k=10.0, T_t=0.0) = step_fct(T-T_t)*step_fct(S1)*(k*(T-T_t))
 
 # INTERCEPT bucket
 
-S1max = 2     # maximum storage capacity of the interception reservoir
+S2max = 2     # maximum storage capacity of the interception reservoir
 k_v = 1.0      # vegetation coeff
 Emax(PET; k_v = 1.0) = k_v*PET
-Ei(S1,PET; k_v = 1.0) = step_fct(S1)*minimum([S1, Emax(PET; k_v = k_v)])
+Ei(S2,PET; k_v = 1.0) = step_fct(S2)*minimum([S2, Emax(PET; k_v = k_v)])
 
-Pe(S1; S1max = 2) = step_fct(S1-S1max)*(S1-S1max)
+Pe(S2; S2max = 2) = step_fct(S2-S2max)*(S2-S2max)
 
 
 # ROOT bucket
 
 l_p   = 0.25  # root coeff
-log_S2max = 0.0   # maximum storage capacity of the root zone reservoir
-Et(S2, Emax, Ei; l_p = 0.25, log_S2max = 0.0) = step_fct(S2)*(Emax(PET; k_v = k_v)-Ei(S1,PET; k_v = k_v))*minimum([1.0, S2/(l_p*10^(log_S2max))])
+log_S3max = 0.0   # maximum storage capacity of the root zone reservoir
+Et(S3, PET, S2; l_p = 0.25, log_S3max = 0.0, k_v = 1.0) = step_fct(S3)*(Emax(PET; k_v = k_v)-Ei(S2,PET; k_v = k_v))*minimum([1.0, S3/(l_p*10.0^(log_S3max))])
 
 log_gamma   = 1.0 # non-linearity
-log_k_s = -6  # hydraulic conductivity
-R(S; log_S2max=0.0, log_k_s = -6, log_gamma = 1.0) = step_fct(S)*10^(log_k_s)*(S/10^(log_S2max))^10^(log_gamma)
+log_k_s = -6.0  # hydraulic conductivity
+R(S3; log_S3max=0.0, log_k_s = -6.0, log_gamma = 1.0) = step_fct(S3)*(10.0^log_k_s)*(S3/(10.0^log_S3max))^(10.0^log_gamma)
 
 # Response Function parameters
-p0 = 10 # A
-p1 = 1 # n
-p2 = 100 # a [days]
+p0 = 10.0 # A
+p1 = 1.0 # n
+p2 = 100.0 # a [days]
 
 # initial states 
-S0_init = 0
-S1_init = 0
-S2_init = 0
+S1_init = 0.0
+S2_init = 0.0
+S3_init = 0.0
 
-p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2, k, T_t , k_v, S1max, l_p, log_S2max, log_k_s, log_gamma]
+p_all_init = [S1_init, S2_init, S3_init, p0, p1, p2, k, T_t , k_v, S2max, l_p, log_S3max, log_k_s, log_gamma]
 
 function swissGW_buckets(p_, t_out)
 
@@ -253,21 +253,21 @@ function swissGW_buckets(p_, t_out)
 
 
     function swissGW_buckets_core!(dS,S,ps,t)
-        k, T_t, k_v, S1max, l_p, log_S2max, log_k_s, log_gamma = ps
+        k, T_t, k_v, S2max, l_p, log_S3max, log_k_s, log_gamma = ps
 
         P    = itp_P(t)
         T    = itp_T(t)
         PET  = itp_PET(t)
 
         dS[1] = Ps(P,T;T_t = T_t) - melt(S[1], T; k = k, T_t = T_t)
-        dS[2] = Pr(P,T;T_t = T_t) + melt(S[1], T; k = k, T_t = T_t) - Ei(S[2],PET; k_v = k_v) - Pe(S[2]; S1max = S1max)
-        dS[3] = Pe(S[2]; S1max = S1max) - Et(S[3], Emax, Ei; l_p = l_p, log_S2max = log_S2max) - R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, log_gamma = log_gamma)
+        dS[2] = Pr(P,T;T_t = T_t) + melt(S[1], T; k = k, T_t = T_t) - Ei(S[2],PET; k_v = k_v) - Pe(S[2]; S2max = S2max)
+        dS[3] = Pe(S[2]; S2max = S2max) - Et(S[3], PET, S[2]; l_p = l_p, log_S3max = log_S3max, k_v = k_v) - R(S[3]; log_S3max=log_S3max, log_k_s = log_k_s, log_gamma = log_gamma)
 
     end
 
     prob = ODEProblem(swissGW_buckets_core!, p_[1:3], Float64.((t_out[1], maximum(t_out))))
 
-    sol = solve(prob, BS3(), u0 = p_[1:3], p=p_[7:end], dt = 1.0, saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= ForwardDiffSensitivity())
+    sol = solve(prob, BS3(), u0 = p_[1:3], p=p_[7:end], dt = 1.0, saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= DiffEqSensitivity.ForwardDiffSensitivity())
 
     # Marvin's version:
     # Qb_ = Qb.(sol[2,:], p_[3], p_[4], p_[5])
@@ -280,10 +280,10 @@ function swissGW_buckets(p_, t_out)
     # block = step[1:] - step[:-1]
     # contrib = np.convolve(recharge, block)
 
-    t = collect(1:5000)
-    step = p0 * gamma_inc(p1, t/p2, IND=0) # IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
+    t = float(collect(1:5000))
+    step = p0 * SpecialFunctions.gamma_inc(p1, t/p2, 0) # last argument: IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
     block = step[2:end] - step[1:end-1]
-    contrib = conv(R(S[3]; log_S2max=log_S2max, log_k_s = log_k_s, log_gamma = log_gamma), block)
+    contrib = DSP.conv(R(S[3]; log_S3max=log_S3max, log_k_s = log_k_s, log_gamma = log_gamma), block)
 
     GW_head = GW_avg + contrib # GW_avg is a specific number
 

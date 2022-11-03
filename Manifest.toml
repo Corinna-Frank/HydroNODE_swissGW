@@ -779,6 +779,18 @@ git-tree-sha1 = "bc9f7725571ddb4ab2c4bc74fa397c1c5ad08943"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
 version = "0.69.1+0"
 
+[[GSL]]
+deps = ["GSL_jll", "Libdl", "Markdown"]
+git-tree-sha1 = "3ebd07d519f5ec318d5bc1b4971e2472e14bd1f0"
+uuid = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
+version = "1.0.1"
+
+[[GSL_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "56f1e2c9e083e0bb7cf9a7055c280beb08a924c0"
+uuid = "1b77fbbe-d8ee-58f0-85f9-836ddc23a7a4"
+version = "2.7.2+0"
+
 [[GalacticOptim]]
 deps = ["ArrayInterfaceCore", "ConsoleProgressMonitor", "DiffResults", "DocStringExtensions", "Logging", "LoggingExtras", "Pkg", "Printf", "ProgressLogging", "Reexport", "Requires", "SciMLBase", "TerminalLoggers"]
 git-tree-sha1 = "6725ceb3d9afbbae9ad08aa7ef206a6ab9559600"

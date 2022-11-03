@@ -16,7 +16,7 @@ using DataFrames, Dates, Statistics
 using DelimitedFiles, CSV #, JLD
 
 using OrdinaryDiffEq, DiffEqFlux, Flux
-using DiffEqSensitivity
+import DiffEqSensitivity
 
 using GalacticOptim, BlackBoxOptim
 using ForwardDiff, Zygote
@@ -24,8 +24,8 @@ using ForwardDiff, Zygote
 using Interpolations
 using Interpolations: interpolate
 
-using SpecialFunctions # for gamma_inc
-using DSP # for conv
+import SpecialFunctions # for gamma_inc
+import DSP # for conv
 
 using Random
 Random.seed!(123)
@@ -114,9 +114,10 @@ norm_T = prep_norm(norm_moments_in[:,3])
 
 itp_method = SteffenMonotonicInterpolation()
 
-itp_Lday = interpolate(data_timepoints, data_x[:,1], itp_method)
-itp_P = interpolate(data_timepoints, data_x[:,2], itp_method)
-itp_T = interpolate(data_timepoints, data_x[:,3], itp_method)
+# ["precipitation","temperature","evaporation"]
+itp_P = interpolate(data_timepoints, data_x[:,1], itp_method)
+itp_T = interpolate(data_timepoints, data_x[:,2], itp_method)
+itp_PET = interpolate(data_timepoints, data_x[:,3], itp_method)
 
 # ===============================================================
 # Bucket model training and full model preparation
@@ -137,7 +138,7 @@ NSE_loss_bucket_w_states(p) =  NSE_loss(swissGW_buckets, p, train_y, train_timep
 
 if train_bucket_model
     # p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2, k, T_t , k_v, S1max, l_p, log_S2max, log_k_s, log_gamma]
-    lower_bounds = [0,0,0, 1e-9,1e-2,1e-2, 1,  0, 0.5, 2, 0.25, -5, -9, -5 ] # [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
+    lower_bounds = [0.0,0.0,0.0, 1e-9,1e-2,1e-2, 1.0,  0.0, 0.5, 2.0, 0.25, -5.0, -9.0, -5.0 ] # [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
     upper_bounds = [0,0,0, 1e4, 1e2, 2e3,  20, 0, 1.5, 2, 0.25,  3,  4, 1.3] # [1500.0, 1500.0, 0.1, 1500.0, 50.0, 5.0, 3.0, 0.0]
 
     SearchRange = [(lower_bounds[i], upper_bounds[i]) for i in 1:length(lower_bounds)]
@@ -161,7 +162,13 @@ else
 end
 @info "... complete!"
 
-Q_bucket, S_bucket  = basic_bucket_incl_states([S_bucket_precalib..., p_bucket_precalib...], train_timepoints)
+# Forward call
+#                [S0_init, S1_init, S2_init, p0, p1, p2,        k,   T_t , k_v, S1max, l_p, log_S2max, log_k_s, log_gamma]
+p_all_expected = [0.0,0.0,0.0,               10.0,10.0,100.0,   10.0, 0.0, 1.0, 2.0,  0.25, 1.0,       1.0,     0.0 ]
+Q_bucket, S_bucket  = swissGW_buckets(p_all_expected, train_timepoints) 
+#Q_bucket, S_bucket  = swissGW_buckets([lower_bounds[1:3]..., lower_bounds[4:end]...], train_timepoints)
+# Q_bucket, S_bucket  = swissGW_buckets([S_bucket_precalib..., p_bucket_precalib...], train_timepoints)
+# Q_bucket, S_bucket  = basic_bucket_incl_states([S_bucket_precalib..., p_bucket_precalib...], train_timepoints)
 
 NSE_opt_bucket = -NSE_loss_bucket_w_states(p_all_opt_bucket)
 
