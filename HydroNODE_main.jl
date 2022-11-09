@@ -4,7 +4,7 @@
 # - build models
 # - train models
 #
-# marvin.hoege@eawag.ch, Mar. 2022
+# marvin.hoege@eawag.ch, Nov. 2022 (v1.1.0)
 # --------------------------------------------------
 
 cd(@__DIR__)
@@ -13,16 +13,18 @@ using Pkg; Pkg.activate("."); Pkg.instantiate()
 using Revise
 
 using DataFrames, Dates, Statistics
-using DelimitedFiles, CSV #, JLD
+using DelimitedFiles, CSV
 
 using OrdinaryDiffEq, DiffEqFlux, Flux
-import DiffEqSensitivity
+using SciMLSensitivity
 
-using GalacticOptim, BlackBoxOptim
-using ForwardDiff, Zygote
+using Optimization, BlackBoxOptim
+using Zygote
 
 using Interpolations
-using Interpolations: interpolate
+
+import SpecialFunctions # for gamma_inc
+import DSP # for conv
 
 import SpecialFunctions # for gamma_inc
 import DSP # for conv
@@ -39,7 +41,7 @@ data_path = joinpath(pwd(),"data")
 data_filename = "Crêtelongue.csv"
 
 # choose model M50 or M100
-chosen_model_id = "M50"
+chosen_model_id = "M100"
 
 # choose basin id
 basin_id = "01013500"
@@ -114,10 +116,10 @@ norm_T = prep_norm(norm_moments_in[:,3])
 
 itp_method = SteffenMonotonicInterpolation()
 
-# ["precipitation","temperature","evaporation"]
-itp_P = interpolate(data_timepoints, data_x[:,1], itp_method)
-itp_T = interpolate(data_timepoints, data_x[:,2], itp_method)
-itp_PET = interpolate(data_timepoints, data_x[:,3], itp_method)
+itp_Lday = interpolate(data_timepoints, data_x[:,1], itp_method)
+itp_P = interpolate(data_timepoints, data_x[:,2], itp_method)
+itp_T = interpolate(data_timepoints, data_x[:,3], itp_method)
+
 
 # ===============================================================
 # Bucket model training and full model preparation
@@ -136,7 +138,7 @@ NSE_loss_bucket_w_states(p) =  NSE_loss(swissGW_buckets, p, train_y, train_timep
 # tmin: Temperature below which precipitation is snow| Range: (-3.0, 0)
 
 
-if train_bucket_model
+if train_bucket_model == true
     # p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2,     k,   T_t , k_v, S1max, l_p,   S2max, k_s, gamma]
     lower_bounds = [0.0,0.0,0.0,               1e-9,1e-2,1e-2,  1.0, 0.0, 0.5, 2.0, 0.25,     1e-5, 0.0, 1e-5 ] # [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
     upper_bounds = [1000.0,1000.0,1000.0,      1e4,  1e2, 2e3, 20.0, 0.0, 1.5, 2.0, 0.25,     1e3,  1e4, 20.0] # [1500.0, 1500.0, 0.1, 1500.0, 50.0, 5.0, 3.0, 0.0]
@@ -194,11 +196,11 @@ NN_input = [norm_S0.(S0_bucket_) norm_S1.(S1_bucket_) norm_P.(P_bucket_) norm_T.
 
 @info "NN pre-training..."
 p_NN_init = pretrain_NNs_for_bucket_processes(chosen_model_id, NN_NODE, p_NN_init,
-    NN_input, p_bucket_precalib, S0_bucket_, S1_bucket_, Lday_bucket_, P_bucket_, T_bucket_;
-    print_results=false)
+    NN_input, p_bucket_precalib, S0_bucket_, S1_bucket_, Lday_bucket_, P_bucket_, T_bucket_)
 @info "... complete!"
 
 pred_NODE_model= prep_pred_NODE(NN_NODE, p_bucket_precalib[6:-1:4], S_bucket_precalib, length.(initial_params.(NN_NODE)))
+
 
 # -------------
 # training
