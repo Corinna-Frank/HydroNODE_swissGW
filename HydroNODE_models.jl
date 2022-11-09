@@ -22,7 +22,7 @@
 # 1) EXP-Hydro model equations
 
 # smooting step function
-step_fct(x) = (tanh(5.0*x) + 1.0)*0.5
+step_fct(x) = (tanh(5.0*(x-0.5)) + 1.0)*0.5
 
 # snow precipitation
 Ps(P, T, Tmin) = step_fct(Tmin-T)*P
@@ -213,7 +213,7 @@ Ps(P, T; T_t = 0.0) = step_fct(T_t-T)*P
 # rain precipitation
 Pr(P, T; T_t = 0.0) = step_fct(T-T_t)*P
 
-melt(S1, T; k=10.0, T_t=0.0) = step_fct(T-T_t)*step_fct(S1)*(k*(T-T_t))
+melt(S1, T; k=10.0, T_t=0.0) = step_fct(T-T_t)*step_fct(S1)*minimum([S1, (k*(T-T_t))])
 
 # INTERCEPT bucket
 
@@ -228,12 +228,12 @@ Pe(S2; S2max = 2) = step_fct(S2-S2max)*(S2-S2max)
 # ROOT bucket
 
 l_p   = 0.25  # root coeff
-log_S3max = 0.0   # maximum storage capacity of the root zone reservoir
-Et(S3, PET, S2; l_p = 0.25, log_S3max = 0.0, k_v = 1.0) = step_fct(S3)*(Emax(PET; k_v = k_v)-Ei(S2,PET; k_v = k_v))*minimum([1.0, S3/(l_p*10.0^(log_S3max))])
+S3max = 1.0   # maximum storage capacity of the root zone reservoir
+Et(S3, PET, S2; l_p = 0.25, S3max = 1.0, k_v = 1.0) = step_fct(S3)*(Emax(PET; k_v = k_v)-Ei(S2,PET; k_v = k_v))*minimum([1.0, S3/(l_p*S3max)])
 
-log_gamma   = 1.0 # non-linearity
-log_k_s = -6.0  # hydraulic conductivity
-R(S3; log_S3max=0.0, log_k_s = -6.0, log_gamma = 1.0) = step_fct(S3)*(10.0^log_k_s)*(S3/(10.0^log_S3max))^(10.0^log_gamma)
+gamma   = 1.0 # non-linearity
+k_s = 1e-6  # hydraulic conductivity
+R(S3; S3max=1.0, k_s = 1e-6, gamma = 0.0) = step_fct(S3)*k_s* ((S3/S3max)^gamma)
 
 # Response Function parameters
 p0 = 10.0 # A
@@ -245,15 +245,16 @@ S1_init = 0.0
 S2_init = 0.0
 S3_init = 0.0
 
-p_all_init = [S1_init, S2_init, S3_init, p0, p1, p2, k, T_t , k_v, S2max, l_p, log_S3max, log_k_s, log_gamma]
+p_all_init = [S1_init, S2_init, S3_init, p0, p1, p2, k, T_t , k_v, S2max, l_p, S3max, k_s, gamma]
 
 function swissGW_buckets(p_, t_out)
 
     p0, p1, p2 = p_[4:6]
+    S3max, k_s, gamma = p_[end-2:end]
 
 
     function swissGW_buckets_core!(dS,S,ps,t)
-        k, T_t, k_v, S2max, l_p, log_S3max, log_k_s, log_gamma = ps
+        k, T_t, k_v, S2max, l_p, S3max, k_s, gamma = ps
 
         P    = itp_P(t)
         T    = itp_T(t)
@@ -261,7 +262,7 @@ function swissGW_buckets(p_, t_out)
 
         dS[1] = Ps(P,T;T_t = T_t) - melt(S[1], T; k = k, T_t = T_t)
         dS[2] = Pr(P,T;T_t = T_t) + melt(S[1], T; k = k, T_t = T_t) - Ei(S[2],PET; k_v = k_v) - Pe(S[2]; S2max = S2max)
-        dS[3] = Pe(S[2]; S2max = S2max) - Et(S[3], PET, S[2]; l_p = l_p, log_S3max = log_S3max, k_v = k_v) - R(S[3]; log_S3max=log_S3max, log_k_s = log_k_s, log_gamma = log_gamma)
+        dS[3] = Pe(S[2]; S2max = S2max) - Et(S[3], PET, S[2]; l_p = l_p, S3max = S3max, k_v = k_v) - R(S[3]; S3max=S3max, k_s = k_s, gamma = gamma)
 
     end
 
@@ -280,12 +281,18 @@ function swissGW_buckets(p_, t_out)
     # block = step[1:] - step[:-1]
     # contrib = np.convolve(recharge, block)
 
-    t = float(collect(1:5000))
-    step = p0 * SpecialFunctions.gamma_inc(p1, t/p2, 0) # last argument: IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
-    block = step[2:end] - step[1:end-1]
-    contrib = DSP.conv(R(S[3]; log_S3max=log_S3max, log_k_s = log_k_s, log_gamma = log_gamma), block)
+    # t = 5000.0#float(collect(1:5000))
+    # step, toDiscard = p0 .* SpecialFunctions.gamma_inc(p1, t/p2, 0) # last argument: IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
+    # block = step[2:end] - step[1:end-1]
+    # contrib = DSP.conv(R(S[3]; S3max=S3max, k_s = k_s, gamma = gamma), block)
+    t_array = float(collect(1:5000))
+    step = [p0 .* SpecialFunctions.gamma_inc(p1, t/p2, 0)[1] for t in t_array] # last argument: IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
+    block = step[2:end] .- step[1:end-1]
+    recharge = R.(sol[3,:]; S3max=S3max, k_s = k_s, gamma = gamma)
+    contrib = DSP.conv(recharge, block) # NEEDS TO BE CUT TO LENGTH: length(t_out), HOW ??
 
-    GW_head = GW_avg + contrib # GW_avg is a specific number
+    GW_avg = 504.8
+    GW_head = GW_avg .+ contrib # GW_avg is a specific number
 
     # return Qout_, sol
     return GW_head, sol

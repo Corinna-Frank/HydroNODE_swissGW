@@ -137,17 +137,17 @@ NSE_loss_bucket_w_states(p) =  NSE_loss(swissGW_buckets, p, train_y, train_timep
 
 
 if train_bucket_model
-    # p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2, k, T_t , k_v, S1max, l_p, log_S2max, log_k_s, log_gamma]
-    lower_bounds = [0.0,0.0,0.0, 1e-9,1e-2,1e-2, 1.0,  0.0, 0.5, 2.0, 0.25, -5.0, -9.0, -5.0 ] # [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
-    upper_bounds = [0,0,0, 1e4, 1e2, 2e3,  20, 0, 1.5, 2, 0.25,  3,  4, 1.3] # [1500.0, 1500.0, 0.1, 1500.0, 50.0, 5.0, 3.0, 0.0]
+    # p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2,     k,   T_t , k_v, S1max, l_p,   S2max, k_s, gamma]
+    lower_bounds = [0.0,0.0,0.0,               1e-9,1e-2,1e-2,  1.0, 0.0, 0.5, 2.0, 0.25,     1e-5, 0.0, 1e-5 ] # [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
+    upper_bounds = [1000.0,1000.0,1000.0,      1e4,  1e2, 2e3, 20.0, 0.0, 1.5, 2.0, 0.25,     1e3,  1e4, 20.0] # [1500.0, 1500.0, 0.1, 1500.0, 50.0, 5.0, 3.0, 0.0]
 
     SearchRange = [(lower_bounds[i], upper_bounds[i]) for i in 1:length(lower_bounds)]
 
     p_all_opt_bucket = best_candidate(BlackBoxOptim.bboptimize(NSE_loss_bucket_w_states; SearchRange, MaxSteps = 5000))
 
 
-    S_bucket_precalib = p_all_opt_bucket[1:2]
-    p_bucket_precalib = p_all_opt_bucket[3:end]
+    S_bucket_precalib = p_all_opt_bucket[1:3]
+    p_bucket_precalib = p_all_opt_bucket[4:end]
 else
 
     bucket_opt_init = readdlm("bucket_opt_init.csv", ',')
@@ -163,8 +163,8 @@ end
 @info "... complete!"
 
 # Forward call
-#                [S0_init, S1_init, S2_init, p0, p1, p2,        k,   T_t , k_v, S1max, l_p, log_S2max, log_k_s, log_gamma]
-p_all_expected = [0.0,0.0,0.0,               10.0,10.0,100.0,   10.0, 0.0, 1.0, 2.0,  0.25, 1.0,       1.0,     0.0 ]
+#                [S0_init, S1_init, S2_init, p0, p1, p2,        k,   T_t , k_v, S1max, l_p, S2max, log_k_s, log_gamma]
+p_all_expected = [100.0,100.0,100.0,         0.11,1.04,14.27,   1.0, 0.0, 0.95, 2.0,  0.25, 7.45,       6.99,     0.92 ]
 Q_bucket, S_bucket  = swissGW_buckets(p_all_expected, train_timepoints) 
 #Q_bucket, S_bucket  = swissGW_buckets([lower_bounds[1:3]..., lower_bounds[4:end]...], train_timepoints)
 # Q_bucket, S_bucket  = swissGW_buckets([S_bucket_precalib..., p_bucket_precalib...], train_timepoints)
