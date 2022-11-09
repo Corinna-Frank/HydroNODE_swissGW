@@ -268,7 +268,7 @@ function swissGW_buckets(p_, t_out)
 
     prob = ODEProblem(swissGW_buckets_core!, p_[1:3], Float64.((t_out[1], maximum(t_out))))
 
-    sol = solve(prob, BS3(), u0 = p_[1:3], p=p_[7:end], dt = 1.0, saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= DiffEqSensitivity.ForwardDiffSensitivity())
+    sol = solve(prob, BS3(), u0 = p_[1:3], p=p_[7:end], dt = 1.0, saveat=t_out, reltol=1e-3, abstol=1e-3, sensealg= SciMLSensitivity.BacksolveAdjoint())
 
     # Marvin's version:
     # Qb_ = Qb.(sol[2,:], p_[3], p_[4], p_[5])

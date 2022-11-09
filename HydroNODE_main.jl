@@ -26,9 +26,6 @@ using Interpolations
 import SpecialFunctions # for gamma_inc
 import DSP # for conv
 
-import SpecialFunctions # for gamma_inc
-import DSP # for conv
-
 using Random
 Random.seed!(123)
 
@@ -116,9 +113,10 @@ norm_T = prep_norm(norm_moments_in[:,3])
 
 itp_method = SteffenMonotonicInterpolation()
 
-itp_Lday = interpolate(data_timepoints, data_x[:,1], itp_method)
-itp_P = interpolate(data_timepoints, data_x[:,2], itp_method)
-itp_T = interpolate(data_timepoints, data_x[:,3], itp_method)
+itp_P = interpolate(data_timepoints, data_x[:,1], itp_method)
+itp_T = interpolate(data_timepoints, data_x[:,2], itp_method)
+itp_PET = interpolate(data_timepoints, data_x[:,3], itp_method)
+
 
 
 # ===============================================================
