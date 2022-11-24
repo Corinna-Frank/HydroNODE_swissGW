@@ -1,0 +1,4 @@
+0: Black-box-optim., GW base set to mean over training period
+1: Black-box-optim., GW base set to 504.5 m, Fitness: -0.166899579
+2: same as 1, but 10k iterations, Fitness: -0.1738
+3: 

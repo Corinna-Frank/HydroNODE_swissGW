@@ -25,6 +25,7 @@ using Interpolations
 
 import SpecialFunctions # for gamma_inc
 import DSP # for conv
+using Plots
 
 using Random
 Random.seed!(123)
@@ -138,8 +139,10 @@ NSE_loss_bucket_w_states(p) =  NSE_loss(swissGW_buckets, p, train_y, train_timep
 
 if train_bucket_model == true
     # p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2,     k,   T_t , k_v, S1max, l_p,   S2max, k_s, gamma]
-    lower_bounds = [0.0,0.0,0.0,               1e-9,1e-2,1e-2,  1.0, 0.0, 0.5, 2.0, 0.25,     1e-5, 0.0, 1e-5 ] # [0.01, 100.0, 0.0, 100.0, 10.0, 0.01, 0.0, -3.0]
-    upper_bounds = [1000.0,1000.0,1000.0,      1e4,  1e2, 2e3, 20.0, 0.0, 1.5, 2.0, 0.25,     1e3,  1e4, 20.0] # [1500.0, 1500.0, 0.1, 1500.0, 50.0, 5.0, 3.0, 0.0]
+    lower_bounds = [10.0,10.0,10.0,               1e-2,1e-1,1e-2,  1.0, 0.0, 0.5, 2.0, 0.25,     1e-1, 0.0, 1e-1 ]
+    upper_bounds = [30.0,30.0,30.0,                1e1, 30.0, 50.0, 5.0, 0.0, 1.5, 2.0, 0.25,     20.0, 20.0, 5.0]
+    # lower_bounds = [0.0,0.0,0.0,               1e-9,1e-2,1e-2,  1.0, 0.0, 0.5, 2.0, 0.25,     1e-5, 0.0, 1e-5 ]
+    # upper_bounds = [1000.0,1000.0,1000.0,      1e4,  1e2, 2e3, 20.0, 0.0, 1.5, 2.0, 0.25,     1e3,  1e4, 20.0]
 
     SearchRange = [(lower_bounds[i], upper_bounds[i]) for i in 1:length(lower_bounds)]
 
@@ -164,7 +167,7 @@ end
 
 # Forward call
 #                [S0_init, S1_init, S2_init, p0, p1, p2,        k,   T_t , k_v, S1max, l_p, S2max, log_k_s, log_gamma]
-p_all_expected = [100.0,100.0,100.0,         0.11,1.04,14.27,   1.0, 0.0, 0.95, 2.0,  0.25, 7.45,       6.99,     0.92 ]
+p_all_expected = [10.0,10.0,10.0,         0.11,1.04,14.27,   1.0, 0.0, 0.95, 2.0,  0.25, 7.45,       6.99,     0.92 ]
 Q_bucket, S_bucket  = swissGW_buckets(p_all_expected, train_timepoints) 
 #Q_bucket, S_bucket  = swissGW_buckets([lower_bounds[1:3]..., lower_bounds[4:end]...], train_timepoints)
 # Q_bucket, S_bucket  = swissGW_buckets([S_bucket_precalib..., p_bucket_precalib...], train_timepoints)
@@ -172,7 +175,9 @@ Q_bucket, S_bucket  = swissGW_buckets(p_all_expected, train_timepoints)
 
 NSE_opt_bucket = -NSE_loss_bucket_w_states(p_all_opt_bucket)
 
-
+# Save parameters:
+writedlm(joinpath(data_path,"p_opt_BBO_2.csv"),p_all_opt_bucket) #, delimiter=";")
+#CSV.write(joinpath(data_path,"p_opt_BBO_1.csv"),DataFrame(p_all_opt_bucket))
 # ===============================================================
 # Neural ODE models
 
