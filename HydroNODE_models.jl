@@ -220,9 +220,8 @@ melt(S1, T; k=10.0, T_t=0.0) = step_fct(T-T_t)*step_fct(S1)*minimum([S1, (k*(T-T
 S2max = 2     # maximum storage capacity of the interception reservoir
 k_v = 1.0      # vegetation coeff
 Emax(PET; k_v = 1.0) = k_v*PET
-Ei(S2,PET; k_v = 1.0) = step_fct(S2)*minimum([S2, Emax(PET; k_v = k_v)])
-
-Pe(S2; S2max = 2) = step_fct(S2-S2max)*(S2-S2max)
+Ei(S2,PET; k_v = 1.0) = minimum([maximum([S2,0]), Emax(PET; k_v = k_v)])
+Pe(S1,S2,PET,P,T; k=10.0, T_t=0.0, k_v=1.0, S2max = 2) = maximum([ zero(eltype(S1)), Pr(P, T; T_t=T_t) + melt(S1, T; k=k, T_t=T_t) - Ei(S2,PET; k_v=k_v) + S2 - S2max ])
 
 
 # ROOT bucket
@@ -233,10 +232,8 @@ Et(S3, PET, S2; l_p = 0.25, S3max = 1.0, k_v = 1.0) = step_fct(S3)*(Emax(PET; k_
 
 gamma   = 1.0 # non-linearity
 k_s = 1e-6  # hydraulic conductivity
-# R(S3; S3max=1.0, k_s = 1e-6, gamma = 0.0) = step_fct(S3)*k_s* ( (maximum([zero(eltype(S3)), S3]) / S3max) ^gamma)
-R(S2, S3, PET; S3max=1.0, k_s = 1e-6, gamma = 0.0, S2max = 2, l_p = 0.25, k_v = 1.0) = minimum([ k_s*((maximum([zero(eltype(S3)), S3])/S3max)^gamma), S3+Pe(S2; S2max = S2max)-Et(S3, PET, S2; l_p = l_p, S3max = S3max, k_v = k_v) ]) 
-R_final(S3; S3max=1.0, k_s = 1e-6, gamma = 0.0) = k_s* ((maximum([zero(eltype(S3)), S3])/S3max)^gamma)
-# R(S3; S3max=1.0, k_s = 1e-6, gamma = 0.0) = step_fct(S3)*k_s* ((S3/S3max)^gamma)
+R(S3; S3max=1.0, k_s = 1e-6, gamma = 0.0) = k_s* (((step_fct(S3)* maximum([zero(eltype(S3)), S3]))/S3max)^gamma)
+
 
 # Response Function parameters
 p0 = 10.0 # A
@@ -253,20 +250,20 @@ p_all_init = [S1_init, S2_init, S3_init, p0, p1, p2, k, T_t , k_v, S2max, l_p, S
 function swissGW_buckets(p_, t_out)
 
     p0, p1, p2 = p_[4:6]
-    k_v, S2max, l_p, S3max, k_s, gamma = p_[end-5:end]
+    k_v, S2max, l_p, S3max, k_s, gamma = p_[end-6:end-1]
+    GW_base = p_[end]
 
 
     function swissGW_buckets_core!(dS,S,ps,t)
-        k, T_t, k_v, S2max, l_p, S3max, k_s, gamma = ps
+        k, T_t, k_v, S2max, l_p, S3max, k_s, gamma, GW_base = ps
 
         P    = itp_P(t)
         T    = itp_T(t)
         PET  = itp_PET(t)
 
         dS[1] = Ps(P,T;T_t = T_t) - melt(S[1], T; k = k, T_t = T_t)
-        dS[2] = Pr(P,T;T_t = T_t) + melt(S[1], T; k = k, T_t = T_t) - Ei(S[2],PET; k_v = k_v) - Pe(S[2]; S2max = S2max)
-        dS[3] = Pe(S[2]; S2max = S2max) - Et(S[3], PET, S[2]; l_p = l_p, S3max = S3max, k_v = k_v) -  R(S[2], S[3], PET; S3max=S3max, k_s = k_s, gamma = gamma, S2max = S2max, l_p = l_p, k_v = k_v)
-        # dS[3] = Pe(S[2]; S2max = S2max) - Et(S[3], PET, S[2]; l_p = l_p, S3max = S3max, k_v = k_v) -  R(S[3]; S3max=S3max, k_s = k_s, gamma = gamma)
+        dS[2] = Pr(P,T;T_t = T_t) + melt(S[1], T; k = k, T_t = T_t) - Ei(S[2],PET; k_v = k_v) - Pe(S[1],S[2],PET,P,T; k=k, T_t=T_t, k_v=k_v, S2max=S2max)
+        dS[3] = Pe(S[1],S[2],PET,P,T; k=k, T_t=T_t, k_v=k_v, S2max=S2max) - Et(S[3], PET, S[2]; l_p = l_p, S3max = S3max, k_v = k_v) -  R(S[3]; S3max=S3max, k_s=k_s, gamma=gamma)
 
     end
 
@@ -285,19 +282,14 @@ function swissGW_buckets(p_, t_out)
     # block = step[1:] - step[:-1]
     # contrib = np.convolve(recharge, block)
 
-    # t = 5000.0#float(collect(1:5000))
-    # step, toDiscard = p0 .* SpecialFunctions.gamma_inc(p1, t/p2, 0) # last argument: IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
-    # block = step[2:end] - step[1:end-1]
-    # contrib = DSP.conv(R(S[3]; S3max=S3max, k_s = k_s, gamma = gamma), block)
     t_array = float(collect(1:5000))
     step = [p0 .* SpecialFunctions.gamma_inc(p1, t/p2, 0)[1] for t in t_array] # last argument: IND ∈ [0,1,2] sets accuracy: IND=0 means 14 significant digits accuracy, IND=1 means 6 significant digit, and IND=2 means only 3 digit accuracy.
     block = step[2:end] .- step[1:end-1]
-    recharge = R.(sol[2,:], sol[3,:], itp_PET.(t_out); S3max=S3max, k_s = k_s, gamma = gamma, S2max = S2max, l_p = l_p, k_v = k_v) #R_final.(sol[3,:]; S3max=S3max, k_s = k_s, gamma = gamma) 
-    # recharge = R.(sol[3,:]; S3max=S3max, k_s = k_s, gamma = gamma)
-    contrib = DSP.conv(recharge, block)[1:length(t_out)] # NEEDS TO BE CUT TO LENGTH: length(t_out), HOW ??
+    recharge = R.(sol[3,:]; S3max=S3max, k_s=k_s, gamma=gamma) 
+    contrib = DSP.conv(recharge, block)[1:length(t_out)]
 
-    GW_avg = 504.5 #504.8
-    GW_head = GW_avg .+ contrib # GW_avg is a specific number
+    # GW_base = 504.5 #504.8
+    GW_head = GW_base .+ contrib # GW_base is a specific number
 
     # return Qout_, sol
     return GW_head, sol

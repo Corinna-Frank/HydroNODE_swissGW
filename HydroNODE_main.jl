@@ -36,7 +36,7 @@ Random.seed!(123)
 
 # set data directory
 data_path = joinpath(pwd(),"data")
-data_filename = "Crêtelongue.csv"
+data_filename = "Gossau.csv"
 
 # choose model M50 or M100
 chosen_model_id = "M100"
@@ -139,8 +139,8 @@ NSE_loss_bucket_w_states(p) =  NSE_loss(swissGW_buckets, p, train_y, train_timep
 
 if train_bucket_model == true
     # p_all_init = [S0_init, S1_init, S2_init, p0, p1, p2,     k,   T_t , k_v, S1max, l_p,   S2max, k_s, gamma]
-    lower_bounds = [10.0,10.0,10.0,               1e-2,1e-1,1e-2,  1.0, 0.0, 0.5, 2.0, 0.25,     1e-1, 0.0, 1e-1 ]
-    upper_bounds = [30.0,30.0,30.0,                1e1, 30.0, 50.0, 5.0, 0.0, 1.5, 2.0, 0.25,     20.0, 20.0, 5.0]
+    lower_bounds = [10.0,10.0,10.0,               1e-2,1e-1,1e-2,  1.0, -1.0, 0.2, 1.0, 0.1,     1e-1, 0.0, 1e-2 ,  500.0]
+    upper_bounds = [40.0,40.0,40.0,                1e1, 30.0, 20.0, 5.0, 1.0, 1.5, 3.0, 0.5,     10.0, 10.0, 20.0,  505.0]
     # lower_bounds = [0.0,0.0,0.0,               1e-9,1e-2,1e-2,  1.0, 0.0, 0.5, 2.0, 0.25,     1e-5, 0.0, 1e-5 ]
     # upper_bounds = [1000.0,1000.0,1000.0,      1e4,  1e2, 2e3, 20.0, 0.0, 1.5, 2.0, 0.25,     1e3,  1e4, 20.0]
 
@@ -166,17 +166,22 @@ end
 @info "... complete!"
 
 # Forward call
-#                [S0_init, S1_init, S2_init, p0, p1, p2,        k,   T_t , k_v, S1max, l_p, S2max, log_k_s, log_gamma]
-p_all_expected = [10.0,10.0,10.0,         0.11,1.04,14.27,   1.0, 0.0, 0.95, 2.0,  0.25, 7.45,       6.99,     0.92 ]
+#                [S0_init, S1_init, S2_init, p0, p1, p2,        k,   T_t , k_v, S1max, l_p, S2max,    k_s, gamma, GW_0]
+p_all_expected = [0.0,0.0,42.3,         0.54,0.5,42.0,        6.76, 0.0,   1.15, 2.0,  0.25, 94.74,   5.63,  1.12,  637.29]
 Q_bucket, S_bucket  = swissGW_buckets(p_all_expected, train_timepoints) 
 #Q_bucket, S_bucket  = swissGW_buckets([lower_bounds[1:3]..., lower_bounds[4:end]...], train_timepoints)
 # Q_bucket, S_bucket  = swissGW_buckets([S_bucket_precalib..., p_bucket_precalib...], train_timepoints)
 # Q_bucket, S_bucket  = basic_bucket_incl_states([S_bucket_precalib..., p_bucket_precalib...], train_timepoints)
 
+plot(S_bucket,size=(1000,600))
+plot(train_y,size=(1500,600))
+plot!(Q_bucket)
+plot(R.(S_bucket[3,1:end]; S3max=13.2, k_s = 28.01, gamma = 2.0))
+
 NSE_opt_bucket = -NSE_loss_bucket_w_states(p_all_opt_bucket)
 
 # Save parameters:
-writedlm(joinpath(data_path,"p_opt_BBO_2.csv"),p_all_opt_bucket) #, delimiter=";")
+writedlm(joinpath(data_path,"p_opt_BBO_6.csv"),p_all_opt_bucket) #, delimiter=";")
 #CSV.write(joinpath(data_path,"p_opt_BBO_1.csv"),DataFrame(p_all_opt_bucket))
 # ===============================================================
 # Neural ODE models

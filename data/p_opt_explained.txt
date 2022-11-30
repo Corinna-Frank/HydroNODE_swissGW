@@ -1,4 +1,7 @@
 0: Black-box-optim., GW base set to mean over training period
 1: Black-box-optim., GW base set to 504.5 m, Fitness: -0.166899579
 2: same as 1, but 10k iterations, Fitness: -0.1738
-3: 
+3: model structure changed, 5k iter, Fitness: -0.1415
+4: same as 4, but looser parameter bounds (all loose), Fitness: -0.2250
+5: same as 4, added base level as learnable parameter, 
+6: same as 5 but step inside R function, Fitness: -0.2317
